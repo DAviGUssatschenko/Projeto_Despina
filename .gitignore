@@ -1,0 +1,41 @@
+```
+# Credenciais
+.env
+*.env
+secrets.py
+config_local.py
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dados originais e pesados
+data/raw/
+data/processed/
+
+# Imagens e TIFs gerados
+reports/figures/
+*.tif
+*.tiff
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+```
