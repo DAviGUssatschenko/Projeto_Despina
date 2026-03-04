@@ -1,4 +1,4 @@
-# Projeto Seca — Análise de Sinistros Agrícolas via Sensoriamento Remoto
+# Projeto Despina — Análise de Sinistros Agrícolas via Sensoriamento Remoto
 
 Pipeline completo para validação de sinistros agrícolas (seca, chuva excessiva, geada, granizo) usando imagens Sentinel-2 do Copernicus e dados climáticos de banco de dados histórico.
 
