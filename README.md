@@ -109,11 +109,6 @@ agricultural-claims-validator/
 ├── output_indices/            # Runtime output — spectral index PNGs (git-ignored)
 │   └── .gitkeep
 │
-├── tests/
-│   ├── __init__.py
-│   ├── test_analysis.py
-│   └── test_soilapt.py
-│
 ├── .env                       # ❌ Your real credentials — NEVER commit
 ├── .env.example               # ✅ Template — safe to commit
 ├── .gitignore
