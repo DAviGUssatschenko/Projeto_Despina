@@ -23,6 +23,13 @@ POSEIDON_TABLES = {
 POSEIDON_GRID_STEP = 0.09009
 
 # ─────────────────────────────────────────────
+# DATABASE URL (Poseidon)
+# ─────────────────────────────────────────────
+# Accepts a full connection string OR individual POSEIDON_DB_* vars.
+# Example: postgresql://user:pass@host:5432/dbname
+DB_URL = os.getenv("DATABASE_URL", os.getenv("DB_URL", os.getenv("POSEIDON_DB_URL", "")))
+
+# ─────────────────────────────────────────────
 # COPERNICUS CREDENTIALS
 # ─────────────────────────────────────────────
 CDSE_CLIENT_ID     = os.getenv("CDSE_CLIENT_ID", "")
@@ -313,6 +320,7 @@ function evaluatePixel(s) {
 # VALIDATION THRESHOLDS
 # ─────────────────────────────────────────────
 VALIDATION_THRESHOLDS = {
+    # ── English keys (used by main.py / internal pipeline) ────────────────
     "drought": {
         "poseidon": {
             "prcp_deficit_pct": 40,
@@ -362,6 +370,13 @@ VALIDATION_THRESHOLDS = {
         }
     },
 }
+
+# ── Portuguese aliases — GeoJSON evento field uses pt-BR ──────────────────
+# seca=drought, chuva=rainfall, geada=frost, granizo=hail
+VALIDATION_THRESHOLDS["seca"]    = VALIDATION_THRESHOLDS["drought"]
+VALIDATION_THRESHOLDS["chuva"]   = VALIDATION_THRESHOLDS["rainfall"]
+VALIDATION_THRESHOLDS["geada"]   = VALIDATION_THRESHOLDS["frost"]
+VALIDATION_THRESHOLDS["granizo"] = VALIDATION_THRESHOLDS["hail"]
 
 # ─────────────────────────────────────────────
 # AGRONOMIC PARAMETERS
