@@ -1,7 +1,7 @@
 """
 modules/storyteller.py
-Gerador do relatório narrativo completo (storytelling) em português.
-Inclui seção de dados de solo EMBRAPA integrada à análise.
+Generator of the complete narrative report (storytelling) in Portuguese.
+Includes EMBRAPA soil data section integrated into the analysis.
 """
 
 from __future__ import annotations
@@ -88,8 +88,7 @@ class StoryTeller:
         self.centroid      = centroid or {}
         self.crop_params   = CROP_PARAMS.get(crop_type, CROP_PARAMS["soja"])
 
-    # ── ponto de entrada ──────────────────────────────────────────────────────
-
+    #entry point
     def generate(
         self,
         analysis:         Dict,
@@ -116,8 +115,7 @@ class StoryTeller:
         self._loss_section(analysis, hist_baseline or {})
         self._verdict_section(analysis)
 
-    # ── cabeçalho ─────────────────────────────────────────────────────────────
-
+    #header
     def _header_block(self) -> None:
         lat = self.centroid.get("lat", "N/D")
         lon = self.centroid.get("lon", "N/D")
@@ -135,8 +133,7 @@ class StoryTeller:
         console.print(Panel(info, title="[bold]IDENTIFICAÇÃO DO SINISTRO[/bold]", border_style="cyan"))
         console.print()
 
-    # ── contexto ──────────────────────────────────────────────────────────────
-
+    #context
     def _context_narrative(self) -> None:
         cp        = self.crop_params
         event_lbl = self.EVENT_LABELS.get(self.event_type, self.event_type)
@@ -168,8 +165,7 @@ class StoryTeller:
         console.print(Panel(text, border_style="blue"))
         console.print()
 
-    # ── Copernicus ────────────────────────────────────────────────────────────
-
+    #copernicus
     def _satellite_section(self, cop: Dict) -> None:
         console.print(Rule("[bold yellow]📡  DADOS SATELITAIS — COPERNICUS / SENTINEL-2[/bold yellow]"))
         console.print()
@@ -189,7 +185,7 @@ class StoryTeller:
         def _status_label(apct, higher_is_bad):
             if apct is None:
                 return "[dim]N/D[/dim]"
-            # Effective drop: positive = going in "bad" direction
+            #effective drop: positive = going in "bad" direction
             effective_drop = -apct if not higher_is_bad else apct
             if   effective_drop >= 20: return "[red]🔴 CRÍTICO[/red]"
             elif effective_drop >= 10: return "[yellow]🟡 ALERTA[/yellow]"
@@ -197,7 +193,7 @@ class StoryTeller:
 
         for idx_name, meta in self.INDEX_META.items():
             if idx_name == "VHI":
-                continue  # VHI handled separately below
+                continue  #VHI handled separately below
             if idx_name not in cop or "error" in cop[idx_name]:
                 continue
             d     = cop[idx_name]
@@ -215,7 +211,7 @@ class StoryTeller:
             status = _status_label(apct, meta["higher_is_bad"])
             tbl.add_row(idx_name, meta["full"], b_lbl, e_lbl, p_lbl, str(obs), status)
 
-        # VHI row in main table
+        #VHI row in main table
         if "VHI" in cop and cop["VHI"].get("event_mean") is not None:
             vhi = cop["VHI"]["event_mean"]
             vhi_color = "red" if vhi < 35 else "yellow" if vhi < 50 else "green"
@@ -230,7 +226,7 @@ class StoryTeller:
         console.print(tbl)
         console.print()
 
-        # VHI panel separado
+        #VHI panel separado
         if "VHI" in cop and cop["VHI"].get("event_mean") is not None:
             vhi = cop["VHI"]["event_mean"]
             vci = cop["VHI"].get("vci", "N/D")
@@ -249,7 +245,7 @@ class StoryTeller:
             ))
             console.print()
 
-        # Narrativa satelital
+        #satellite narrative
         narrative_lines = []
         ndvi_b = cop.get("NDVI", {}).get("baseline_mean")
         ndvi_e = cop.get("NDVI", {}).get("event_mean")
@@ -293,8 +289,7 @@ class StoryTeller:
             ))
         console.print()
 
-    # ── Poseidon ──────────────────────────────────────────────────────────────
-
+    #poseidon
     def _poseidon_section(self, summary: Dict, vote: Dict, neighbors: Dict) -> None:
         console.print(Rule("[bold blue]🌡️   DADOS METEOROLÓGICOS — REDE POSEIDON[/bold blue]"))
         console.print()
@@ -368,7 +363,7 @@ class StoryTeller:
             console.print(vtbl)
         console.print()
 
-    # ── Solo EMBRAPA ──────────────────────────────────────────────────────────
+    #soil EMBRAPA
 
     def _soil_section(self, soil_data: Dict, analysis: Dict) -> None:
         console.print(Rule("[bold green]🪱  ANÁLISE DE SOLO — EMBRAPA / APTIDÃO AGRÍCOLA[/bold green]"))
@@ -384,7 +379,7 @@ class StoryTeller:
         water          = soil_data.get("water_props", {})
         classified_pct = soil_data.get("classified_area_percentage", 0)
 
-        # Tabela de aptidão
+        #fitness table
         apt_tbl = Table.grid(padding=(0, 3))
         apt_tbl.add_column(style="bold cyan",  justify="right")
         apt_tbl.add_column(style="white")
@@ -397,7 +392,7 @@ class StoryTeller:
         console.print(Panel(apt_tbl, title="[bold]Aptidão Agrícola (EMBRAPA)[/bold]", border_style="green"))
         console.print()
 
-        # Propriedades hídricas
+        #water properties
         if water:
             h_tbl = Table(
                 title="Propriedades Hídricas do Solo Dominante",
@@ -428,7 +423,7 @@ class StoryTeller:
             console.print(h_tbl)
             console.print()
 
-        # Lista de solos encontrados (top-5)
+        #list of soils found (top-5)
         soil_types = soil_data.get("soil_types", [])
         if len(soil_types) > 1:
             st_tbl = Table(
@@ -456,7 +451,7 @@ class StoryTeller:
             console.print(st_tbl)
             console.print()
 
-        # Interpretação do solo para o evento
+        #soil interpretation for the event
         soil_check = analysis.get("soil_check", {})
         amplifier  = soil_check.get("amplifier", 1.0) if soil_check else 1.0
         retencao   = soil_check.get("retencao", "média") if soil_check else "média"
@@ -495,8 +490,7 @@ class StoryTeller:
             ))
         console.print()
 
-    # ── análise cruzada ───────────────────────────────────────────────────────
-
+    #cross analysis
     def _cross_analysis_section(
         self, analysis: Dict, cop: Dict, summary: Dict, soil_data: Dict = None
     ) -> None:
@@ -547,7 +541,7 @@ class StoryTeller:
                 f"{'estresse severo confirmado (< 40)' if vhi_e < 40 else 'zona de alerta'}."
             )
 
-        # Solo na análise cruzada
+        #soil in cross analysis
         if soil_data and not soil_data.get("error"):
             soil_check = analysis.get("soil_check", {})
             amplifier  = soil_check.get("amplifier", 1.0) if soil_check else 1.0
@@ -573,8 +567,7 @@ class StoryTeller:
         ))
         console.print()
 
-    # ── checklist ─────────────────────────────────────────────────────────────
-
+    #checklist
     def _checks_section(self, analysis: Dict) -> None:
         console.print(Rule("[bold]🔎  CHECKLIST DE VALIDAÇÃO[/bold]"))
         console.print()
@@ -606,8 +599,7 @@ class StoryTeller:
         )
         console.print()
 
-    # ── perdas ────────────────────────────────────────────────────────────────
-
+    #casualty
     def _loss_section(self, analysis: Dict, hist_baseline: Dict = None) -> None:
         loss = analysis.get("loss_estimate", {})
         if not loss:
@@ -629,7 +621,7 @@ class StoryTeller:
             tbl.add_row("[cyan]Referência histórica local:[/cyan]",
                         f"[cyan]~{ly} sc/ha[/cyan] [dim](base: {ny} anos — {yrs})[/dim]")
 
-        # Solo amplificador
+        #solo amplifier
         soil_amp = loss.get("soil_amplifier")
         if soil_amp:
             amp_color = "red" if soil_amp["amplifier"] > 1.0 else "green"
@@ -663,8 +655,7 @@ class StoryTeller:
         console.print(f"[dim]{detail}[/dim]")
         console.print()
 
-    # ── veredicto ─────────────────────────────────────────────────────────────
-
+    #verdict
     def _verdict_section(self, analysis: Dict) -> None:
         verdict    = analysis.get("verdict", "INCONCLUSIVO")
         confidence = analysis.get("confidence", 0)

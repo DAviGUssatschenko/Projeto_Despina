@@ -14,7 +14,7 @@ from docx.oxml import OxmlElement
 
 from config import CROP_PARAMS, CLIMATE_NORMALS_RS, SOIL_APTITUDE_CLASSES
 
-# ── Paleta de cores ────────────────────────────────────────────────────────────
+#color palette
 C_AZUL_ESC  = RGBColor(0x1A, 0x5C, 0x96)
 C_AZUL_MED  = RGBColor(0x27, 0x80, 0xC8)
 C_VERDE     = RGBColor(0x1E, 0x8B, 0x4C)
@@ -55,8 +55,7 @@ INDEX_META = {
 }
 
 
-# ── Utilitários de formatação ─────────────────────────────────────────────────
-
+#formatting utilities
 def _brl(v):
     return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -194,8 +193,7 @@ def _add_footer(doc):
     pPr.insert(0, tabs)
 
 
-# ── Classe principal ──────────────────────────────────────────────────────────
-
+#main class
 class DocxExporter:
 
     def __init__(
@@ -221,8 +219,7 @@ class DocxExporter:
         self.doc.styles["Normal"].font.size = Pt(10)
         _add_footer(self.doc)
 
-    # ── ponto de entrada corrigido ────────────────────────────────────────────
-
+    #fixed entry point
     def export(
         self,
         analysis:      Dict,
@@ -230,8 +227,8 @@ class DocxExporter:
         pos_summ:      Dict,
         pos_vote:      Dict,
         output_path:   str,
-        hist_baseline: Dict = None,   # ← CORRIGIDO: estava faltando
-        soil_data:     Dict = None,   # ← NOVO: dados de solo
+        hist_baseline: Dict = None,   #was missing
+        soil_data:     Dict = None,   #soil data
     ) -> str:
         self._cover()
 
@@ -247,7 +244,7 @@ class DocxExporter:
         self._sec("4. DADOS METEOROLÓGICOS — REDE POSEIDON")
         self._poseidon(pos_summ, pos_vote)
 
-        # Seção de solo — só exibe se dados disponíveis
+        #soil section — only displays if data is available.
         if soil_data and not soil_data.get("error"):
             self._sec("5. ANÁLISE DE SOLO — EMBRAPA / APTIDÃO AGRÍCOLA")
             self._soil(soil_data, analysis)
@@ -266,8 +263,7 @@ class DocxExporter:
         self.doc.save(output_path)
         return output_path
 
-    # ── seção helper ──────────────────────────────────────────────────────────
-
+    #helper section
     def _sec(self, title):
         doc = self.doc
         doc.add_paragraph()
@@ -277,8 +273,7 @@ class DocxExporter:
         p.paragraph_format.space_after  = Pt(6)
         _run(p, f"  {title}", bold=True, size=11, color=C_BRANCO)
 
-    # ── capa ──────────────────────────────────────────────────────────────────
-
+    #cover
     def _cover(self):
         doc = self.doc
         for _ in range(4):
@@ -323,8 +318,7 @@ class DocxExporter:
              size=9, color=C_CINZA_CLR, italic=True)
         doc.add_page_break()
 
-    # ── identificação ─────────────────────────────────────────────────────────
-
+    #identification
     def _ident(self):
         doc = self.doc
         doc.add_paragraph()
@@ -352,8 +346,7 @@ class DocxExporter:
                 p = cell.paragraphs[0]
                 _run(p, txt, bold=(j == 0), size=10)
 
-    # ── contexto ──────────────────────────────────────────────────────────────
-
+    #context
     def _context(self):
         doc = self.doc
         cp  = self.crop_params
@@ -368,8 +361,7 @@ class DocxExporter:
             f"{_brl(cp['yield_avg_sacas_ha'] * self.area_ha * cp['price_brl_saca'])} (ref. CEPEA)."
         ), size=10)
 
-    # ── satélite ──────────────────────────────────────────────────────────────
-
+    #satellite
     def _satellite(self, cop):
         doc = self.doc
         doc.add_paragraph()
@@ -412,8 +404,7 @@ class DocxExporter:
                  bold=True, size=10, color=vc)
         doc.add_paragraph()
 
-    # ── Poseidon ──────────────────────────────────────────────────────────────
-
+    #poseidon
     def _poseidon(self, summary, vote):
         doc = self.doc
         doc.add_paragraph()
@@ -480,8 +471,7 @@ class DocxExporter:
                 ], alt=(i % 2 == 1), colors=[None, None, c2, None])
         doc.add_paragraph()
 
-    # ── Solo EMBRAPA ──────────────────────────────────────────────────────────
-
+    #soil EMBRAPA
     def _soil(self, soil_data: Dict, analysis: Dict):
         doc = self.doc
         doc.add_paragraph()
@@ -496,7 +486,7 @@ class DocxExporter:
         water          = soil_data.get("water_props", {})
         cl_pct         = soil_data.get("classified_area_percentage", 0)
 
-        # Tabela de aptidão
+        #fitness table
         tbl = doc.add_table(rows=1, cols=2)
         tbl.style = "Table Grid"
         _hdr_row(tbl, ["Atributo do Solo", "Valor / Descrição"], bg=HEX_SOLO_HDR)
@@ -521,7 +511,7 @@ class DocxExporter:
                 _run(p, txt, bold=(j == 0), size=10, color=(cor_v if j == 1 else None))
         doc.add_paragraph()
 
-        # Propriedades hídricas
+        #water properties
         if water:
             awc = water.get("AWC", "N/D")
             ks  = water.get("Ks",  "N/D")
@@ -552,7 +542,7 @@ class DocxExporter:
                     _run(p, txt, bold=(j == 0), size=10)
             doc.add_paragraph()
 
-        # Outros solos do talhão
+        #other soils in the plot
         soil_types = soil_data.get("soil_types", [])
         if len(soil_types) > 1:
             tbl3 = doc.add_table(rows=1, cols=4)
@@ -572,7 +562,7 @@ class DocxExporter:
                 ], alt=(i % 2 == 1), colors=[None, None, cor, None])
             doc.add_paragraph()
 
-        # Interpretação solo × evento
+        #solo performance × event
         soil_check = analysis.get("soil_check", {})
         amplifier  = soil_check.get("amplifier", 1.0) if soil_check else 1.0
         if amplifier != 1.0:
@@ -590,8 +580,7 @@ class DocxExporter:
             ), bold=True, size=10, color=cor_amp)
         doc.add_paragraph()
 
-    # ── checklist ─────────────────────────────────────────────────────────────
-
+    #checklist
     def _checks(self, analysis):
         doc    = self.doc
         checks = [c for c in analysis.get("checks", []) if c.get("weight", 0) > 0]
@@ -619,8 +608,7 @@ class DocxExporter:
         ), bold=True, size=10, color=C_AZUL_ESC)
         doc.add_paragraph()
 
-    # ── perdas ────────────────────────────────────────────────────────────────
-
+    #casualty
     def _loss(self, analysis, hist_baseline: Dict = None):
         loss = analysis.get("loss_estimate", {})
         if not loss:
@@ -637,7 +625,7 @@ class DocxExporter:
             ("Produtividade esperada",        f"{loss.get('expected_yield_sacas_ha', 0)} sc/ha"),
         ]
 
-        # Histórico local
+        #local history
         hist = loss.get("hist_baseline") or hist_baseline
         if hist and hist.get("local_yield_est_sacas_ha"):
             fields.append((
@@ -645,7 +633,7 @@ class DocxExporter:
                 f"~{hist['local_yield_est_sacas_ha']:.1f} sc/ha ({hist.get('years_used','')})",
             ))
 
-        # Fator solo
+        #solo factor
         soil_amp = loss.get("soil_amplifier")
         if soil_amp:
             amp = soil_amp["amplifier"]
@@ -672,7 +660,7 @@ class DocxExporter:
                 _cell_margins(cell)
                 p = cell.paragraphs[0]
                 _run(p, txt, bold=(j == 0), size=10)
-        # Linha de perda final
+        #final loss line
         row = tbl.add_row()
         for cell in row.cells:
             _shd(cell, "FFD6D6")
@@ -694,8 +682,7 @@ class DocxExporter:
         ), size=9, color=C_CINZA, italic=True)
         doc.add_paragraph()
 
-    # ── veredicto ─────────────────────────────────────────────────────────────
-
+    #verdict
     def _verdict(self, analysis):
         doc     = self.doc
         verdict = analysis.get("verdict", "INCONCLUSIVO")
@@ -720,7 +707,7 @@ class DocxExporter:
         p2.paragraph_format.space_before = Pt(2)
         p2.paragraph_format.space_after  = Pt(4)
         _run(p2, f"Nível de Confiança: {conf:.0f}%", bold=True, size=12, color=C_AZUL_ESC)
-        # Severidade
+        #severity
         idw = analysis.get("idw_score", 0)
         sev = analysis.get("severity", "")
         if idw:
@@ -769,8 +756,7 @@ class DocxExporter:
             ))
         doc.add_paragraph()
 
-    # ── nota final ────────────────────────────────────────────────────────────
-
+    #final note
     def _note(self, soil_data: Dict = None):
         doc = self.doc
         p   = doc.add_paragraph()
