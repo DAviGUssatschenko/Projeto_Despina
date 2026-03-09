@@ -215,7 +215,7 @@ This generates two outputs in the project root:
 
 ```bash
 python main.py \
-  --geojson fazenda.geojson \
+  --geojson minha_fazenda.geojson \
   --start 2024-01-01 \
   --end 2024-03-31 \
   --problem seca \
