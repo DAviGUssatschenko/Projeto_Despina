@@ -48,7 +48,7 @@ def _haversine_vec(lat: float, lon: float,
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PoseidonConnector:
-    """Acess the Poseidon database and provides interpolated climate data."""
+    """Access the Poseidon database and provide interpolated climate data."""
 
     def __init__(self, db_url: str):
         self.db_url = db_url
@@ -268,11 +268,11 @@ class PoseidonConnector:
             result["lat"]       = round(point["latitude"], 5)
             result["lon"]       = round(point["longitude"], 5)
             result["direction"] = direction
-            # Backward-compat: "confirmed" if intensity >= 40
+            # Legacy: "confirmed" if intensity >= 40
             result["confirmed"] = result.get("intensity", 0) >= 40
             votes[direction] = result
 
-            # IDW Weight: uses centroid if available, otherwise uniform weight
+            # IDW weight: uses centroid if available, otherwise uniform
             if center_lat is not None and center_lon is not None:
                 dist_km = max(haversine_km(center_lat, center_lon,
                                            point["latitude"], point["longitude"]), 0.1)
@@ -311,8 +311,8 @@ class PoseidonConnector:
             "weighted_score": weighted_score,
             "signal_level":   signal_level,
             "description": (
-                f"Score climático IDW: {weighted_score:.0f}/100 — "
-                f"sinal {signal_level} "
+                f"IDW Climate Score: {weighted_score:.0f}/100 — "
+                f"signal {signal_level} "
                 f"({'✅ APPROVED' if passed else '❌ REJECTED'})"
             ),
         }
@@ -355,7 +355,7 @@ class PoseidonConnector:
             tavg_anomaly = tavg_mean - normal_tavg
             rh_avg_mean  = df["rh_avg"].mean()
 
-            # Water deficit: 0% prcp = 60pts | 40% prcp = 36pts | 80% = 12pts | 100% = 0pts
+            # Water deficit: 0% prcp = 60pts | 40% = 36pts | 80% = 12pts | 100% = 0pts
             prcp_score = max(0.0, (100.0 - prcp_pct) / 100.0 * 60.0)
             # Above-normal temperature: +5°C = 25pts (linear)
             temp_score = min(max(tavg_anomaly, 0.0), 5.0) / 5.0 * 25.0
@@ -363,7 +363,7 @@ class PoseidonConnector:
             rh_score   = max(0.0, min(70.0 - rh_avg_mean, 30.0)) / 30.0 * 15.0
             intensity  = round(prcp_score + temp_score + rh_score, 1)
 
-            # Backward-compat: original threshold was prcp_pct < 40 AND (temp OR rh)
+            # Legacy: original threshold was prcp_pct < 40 AND (temp OR rh)
             confirmed_legacy = (
                 prcp_pct < pos_thresh.get("prcp_deficit_pct", 40) and
                 (tavg_anomaly > pos_thresh.get("tavg_anomaly_c", 2.0) or
@@ -379,9 +379,9 @@ class PoseidonConnector:
                 "tavg_anomaly":   round(tavg_anomaly, 2),
                 "rh_avg":         round(rh_avg_mean, 1),
                 "reason": (
-                    f"Prcp {prcp_pct:.0f}% from normal | "
-                    f"Tmed anomalia {tavg_anomaly:+.1f}°C | "
-                    f"UR {rh_avg_mean:.0f}% | Intensity {intensity:.0f}/100"
+                    f"Prcp {prcp_pct:.0f}% of normal | "
+                    f"Tmean anomaly {tavg_anomaly:+.1f}°C | "
+                    f"RH {rh_avg_mean:.0f}% | Intensity {intensity:.0f}/100"
                 ),
             }
 
@@ -392,10 +392,10 @@ class PoseidonConnector:
             rh_avg_mean  = df["rh_avg"].mean()
             wspd_max_max = df["wspd_max"].max()
 
-            # Excesso rainfall: 150% above normal = 65pts
+            # Excess rainfall: 150% above normal = 65pts
             excess_pct  = max(0.0, prcp_pct - 100.0)
             prcp_score  = min(excess_pct / 150.0, 1.0) * 65.0
-            # High humidity: RH 100% = 25pts (statirng from  75%)
+            # High humidity: RH 100% = 25pts (starting from 75%)
             rh_score    = max(0.0, rh_avg_mean - 75.0) / 25.0 * 25.0
             # Wind: 80 km/h = 10pts
             wind_score  = min(max(wspd_max_max - 20.0, 0.0) / 60.0, 1.0) * 10.0
@@ -413,8 +413,8 @@ class PoseidonConnector:
                 "rh_avg":        round(rh_avg_mean, 1),
                 "wspd_max":      round(wspd_max_max, 1),
                 "reason": (
-                    f"Prcp {prcp_pct:.0f}% do normal | "
-                    f"UR {rh_avg_mean:.0f}% | Rajada {wspd_max_max:.1f} km/h | "
+                    f"Prcp {prcp_pct:.0f}% of normal | "
+                    f"RH {rh_avg_mean:.0f}% | Gust {wspd_max_max:.1f} km/h | "
                     f"Intensity {intensity:.0f}/100"
                 ),
             }
@@ -428,7 +428,7 @@ class PoseidonConnector:
 
             # Frost days: 5+ days = 50pts
             days_score  = min(frost_days / 5.0, 1.0) * 50.0
-            # Consecutive days: 3+ dias = 30pts
+            # Consecutive days: 3+ days = 30pts
             consec_score = min(consecutive / 3.0, 1.0) * 30.0
             # Severity: tmin -5°C = 20pts (from +2°C to -5°C = 7°C range)
             depth_score = max(0.0, min(2.0 - tmin_abs, 7.0)) / 7.0 * 20.0
@@ -442,9 +442,9 @@ class PoseidonConnector:
                 "consecutive": int(consecutive),
                 "tmin_abs":    round(tmin_abs, 2),
                 "reason": (
-                    f"{frost_days} dias tmin < {pos_thresh.get('tmin_threshold',2)}°C | "
+                    f"{frost_days} days tmin < {pos_thresh.get('tmin_threshold',2)}°C | "
                     f"Consecutive: {consecutive} | "
-                    f"Tmin abs: {tmin_abs:.1f}°C | Intensidade {intensity:.0f}/100"
+                    f"Abs Tmin: {tmin_abs:.1f}°C | Intensity {intensity:.0f}/100"
                 ),
             }
 
@@ -453,11 +453,11 @@ class PoseidonConnector:
             high_wind_days  = int((df["wspd_max"]  > pos_thresh.get("wspd_max_threshold", 40)).sum())
             wspd_max_max    = df["wspd_max"].max()
 
-            # Chuva intensa: 2+ dias = 50pts
+            # Heavy rain: 2+ days = 50pts
             rain_score  = min(heavy_rain_days / 2.0, 1.0) * 50.0
-            # Vento forte: 2+ dias = 30pts
+            # Strong wind: 2+ days = 30pts
             wind_score  = min(high_wind_days  / 2.0, 1.0) * 30.0
-            # Bônus intensidade: 80+ km/h = 20pts extras
+            # Intensity bonus: 80+ km/h = 20 extra pts
             bonus_score = min(max(wspd_max_max - 40.0, 0.0) / 40.0, 1.0) * 20.0
             intensity   = round(rain_score + wind_score + bonus_score, 1)
 
@@ -485,7 +485,7 @@ class PoseidonConnector:
         start_date: date,
         end_date: date,
     ) -> Dict:
-        """Fetches dataa from nearest usca dados do ponto mais próximo (sem IDW). 1 query SQL."""
+        """Fetches weather data from the nearest point (no IDW). Single SQL query."""
         pid = nearest["point_id"]
         df  = self.get_weather_data([pid], start_date, end_date)
         if df.empty:
@@ -520,7 +520,7 @@ class PoseidonConnector:
 
         pid        = nearest["point_id"]
         periods    = []
-        years_map  = {}   # year_label → actual year for readbility
+        years_map  = {}   # year_label → actual year for readability
 
         for delta in range(1, years_back + 1):
             try:
@@ -534,7 +534,7 @@ class PoseidonConnector:
         if not periods:
             return {}
 
-        # ── One query with OR across periods ───────────────────────────────────
+        # ── Single query with OR across periods ──────────────────────────────────
         where_clauses = " OR ".join(
             f"(date BETWEEN %s AND %s)" for _ in periods
         )
