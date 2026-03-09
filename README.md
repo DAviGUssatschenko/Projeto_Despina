@@ -159,15 +159,25 @@ cp .env.example .env
 Copy `.env.example` to `.env` and fill in your values:
 
 ```dotenv
-# Copernicus / Sentinel Hub credentials
-CDSE_CLIENT_ID=your_client_id_here
-CDSE_CLIENT_SECRET=your_client_secret_here
+# ─────────────────────────────────────────────────────────────────────────────
+# .env — Project Credentials
+# Fill in the values ​​and place this file in the project ROOT (next to config.py).
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Optional: override the default EMBRAPA shapefile path
-# EMBRAPA_SHAPEFILE=/custom/path/to/aptagr_bra.shp
+# ── DataBase Poseidon (PostgreSQL) ───────────────────────────────────────────────
+POSEIDON_DB_HOST=''
+POSEIDON_DB_PORT=''
+POSEIDON_DB_NAME=''
+POSEIDON_DB_PASSWORD=''
+POSEIDON_DB_USER=''
 
-# Optional: override the default spectral index image output directory
-# OUTPUT_INDICES_DIR=/custom/path/to/output_indices
+# ── Copernicus / Sentinel Hub ─────────────────────────────────────────────────
+CDSE_CLIENT_ID= 'YOUR_ID'
+CDSE_CLIENT_SECRET= 'YOUR_SECRET_ID'
+
+# ── Alternatives paths ─────────────────
+# EMBRAPA_SHAPEFILE= ~/alternative/path/aptagr_bra.shp
+# OUTPUT_INDICES_DIR= ~/alternative/path/output_indices
 ```
 
 > **Never commit `.env`** — it is already listed in `.gitignore`.  
@@ -180,13 +190,15 @@ CDSE_CLIENT_SECRET=your_client_secret_here
 ### Step 1 — Run the validation pipeline (CLI)
 
 ```bash
+ALL OF THIS ARE EXEMPLES
+
 python main.py \
   --geojson  farm.geojson \
   --start    2024-01-01 \
   --end      2024-03-31 \
   --problem  drought \
   --crop     soybean \
-  --db       "postgresql://user:password@host:5434/poseidon" \
+  --db       "postgresql://user:password@host:port/db_name" \
   --planting 2023-10-20 \
   --farm-name "Fazenda São João"
 ```
