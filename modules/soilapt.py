@@ -1,7 +1,7 @@
 """
 modules/soilapt.py
-Análise de aptidão agrícola do solo via shapefile EMBRAPA.
-Retorna dados enriquecidos para uso no relatório de sinistro.
+Soil agricultural suitability analysis using the EMBRAPA shapefile.
+Returns enriched data for use in the loss report.
 """
 
 import geopandas as gpd
@@ -17,11 +17,11 @@ from config import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Utilitários
+# Utilitaries
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _fix_encoding(value) -> str:
-    """Corrige mojibake latin1→utf-8 em strings do shapefile EMBRAPA."""
+    """Fixes latin1→utf-8 mojibake in strings from the EMBRAPA shapefile."""
     if pd.isna(value):
         return ""
     try:
@@ -32,8 +32,8 @@ def _fix_encoding(value) -> str:
 
 def _split_legend(legend_value: str):
     """
-    Divide 'CXbd - Cambissolo Háplico Tb Distrófico' em (código, nome).
-    Retorna (legend_value, legend_value) se não houver separador.
+    Splits 'CXbd - Cambissolo Háplico Tb Distrófico' into (code, name).
+    Returns (legend_value, legend_value) if there is no separator.
     """
     if not legend_value or legend_value == "Unknown":
         return "Unknown", "Unknown"
@@ -46,8 +46,8 @@ def _split_legend(legend_value: str):
 
 def _resolve_soil_name(soil_code: str, soil_name: str) -> str:
     """
-    Tenta resolver o nome completo do solo a partir do código EMBRAPA.
-    Usa SOIL_CODE_ALIASES do config como fallback.
+    Tries to resolve the full soil name from the EMBRAPA code.
+    Uses SOIL_CODE_ALIASES from config as a fallback.
     """
     code_lower = soil_code.lower().strip()
     for alias, full_name in SOIL_CODE_ALIASES.items():
@@ -61,13 +61,13 @@ def _resolve_soil_name(soil_code: str, soil_name: str) -> str:
 
 
 def get_soil_water_props(soil_code: str, soil_name: str) -> Dict:
-    """Retorna propriedades hídricas do solo, com fallback para 'default'."""
+    """Returns soil water properties, with fallback to 'default'."""
     resolved = _resolve_soil_name(soil_code, soil_name)
     return SOIL_WATER_PROPERTIES.get(resolved, SOIL_WATER_PROPERTIES["default"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Função principal
+# Main function
 # ─────────────────────────────────────────────────────────────────────────────
 
 def check_soil_suitability(
@@ -75,72 +75,72 @@ def check_soil_suitability(
     soil_shapefile: Optional[str] = None,
 ) -> Dict:
     """
-    Analisa a aptidão agrícola do solo dentro de um talhão (GeoJSON),
-    cruzando com o shapefile de aptidão da EMBRAPA.
+    Analyzes soil agricultural suitability within a field (GeoJSON),
+    intersecting it with the EMBRAPA suitability shapefile.
 
-    Retorna dict rico com:
-      - dominant_class: classe dominante (int)
-      - soil_code / soil_name: código e nome do solo dominante
+    Returns a rich dict with:
+      - dominant_class: dominant class (int)
+      - soil_code / soil_name: code and name of the dominant soil
       - suitable_for_agriculture: bool
-      - dominant_percentage: % da área com a classe dominante
-      - area_breakdown: distribuição por classe (%)
-      - soil_types: lista de solos encontrados na área
-      - water_props: propriedades hídricas do solo dominante
-      - aptitude_label / aptitude_description: texto legível
+      - dominant_percentage: % of area with the dominant class
+      - area_breakdown: distribution by class (%)
+      - soil_types: list of soils found in the area
+      - water_props: water properties of the dominant soil
+      - aptitude_label / aptitude_description: readable text
       - classified_area_percentage / unclassified_area_percentage
-      - error: str se algo deu errado (campo ausente = sem erro)
+      - error: str if something went wrong (missing field = no error)
     """
     shp_path = soil_shapefile or EMBRAPA_SHAPEFILE
 
-    # ── carrega talhão ────────────────────────────────────────────────────────
+    # ── load field ────────────────────────────────────────────────────────
     try:
         field = gpd.read_file(geojson_path)
     except Exception as e:
-        return {"error": f"Erro ao carregar GeoJSON: {e}"}
+        return {"error": f"Error loading GeoJSON: {e}"}
 
     if field.empty:
-        return {"error": "GeoJSON vazio ou sem geometria válida."}
+        return {"error": "GeoJSON empty or without valid geometry."}
 
-    # ── carrega shapefile EMBRAPA ─────────────────────────────────────────────
+    # ── load EMBRAPA shapefile ─────────────────────────────────────────────
     try:
-        # Carregamos apenas as colunas necessárias; legenda_ap é opcional
+        # Load only necessary columns; legenda_ap is optional
         soils = gpd.read_file(shp_path, encoding="latin1")
     except Exception as e:
-        return {"error": f"Erro ao carregar shapefile EMBRAPA ({shp_path}): {e}"}
+        return {"error": f"Error loading EMBRAPA shapefile ({shp_path}): {e}"}
 
     if soils.empty:
-        return {"error": "Shapefile EMBRAPA vazio."}
+        return {"error": "Empty EMBRAPA shapefile."}
 
-    # ── corrige encoding ──────────────────────────────────────────────────────
+    # ── fix encoding ──────────────────────────────────────────────────────
     for col in ["legenda", "legenda_ap"]:
         if col in soils.columns:
             soils[col] = soils[col].apply(_fix_encoding)
 
-    # ── alinha CRS e faz clip ─────────────────────────────────────────────────
+    # ── align CRS and clip ─────────────────────────────────────────────────
     soils = soils.to_crs(field.crs)
     minx, miny, maxx, maxy = field.total_bounds
     candidate_idx = list(soils.sindex.intersection((minx, miny, maxx, maxy)))
     candidates    = soils.iloc[candidate_idx].copy()
 
     if candidates.empty:
-        return {"error": "Nenhum dado de solo encontrado para esta área."}
+        return {"error": "No soil data found for this area."}
 
     clipped = gpd.clip(candidates, field)
     if clipped.empty:
-        return {"error": "Área do talhão não intersecta com dados de solo EMBRAPA."}
+        return {"error": "Field area does not intersect with EMBRAPA soil data."}
 
-    # ── calcula áreas em SIRGAS 2000 Cônica (EPSG:5880) ──────────────────────
+    # ── calculate areas in SIRGAS 2000 Conic (EPSG:5880) ──────────────────────
     clipped = clipped.to_crs(5880)
     clipped["_area_m2"] = clipped.geometry.area
     total_area = clipped["_area_m2"].sum()
 
     if total_area == 0:
-        return {"error": "Área resultante é zero após reprojeção."}
+        return {"error": "Resulting area is zero after reprojection."}
 
-    # ── aptidão ───────────────────────────────────────────────────────────────
+    # ── suitability ───────────────────────────────────────────────────────────────
     apt_col = "classe_apt" if "classe_apt" in clipped.columns else None
     if apt_col is None:
-        return {"error": "Coluna 'classe_apt' não encontrada no shapefile."}
+        return {"error": "Column 'classe_apt' not found in the shapefile."}
 
     clipped["_apt_num"] = pd.to_numeric(clipped[apt_col], errors="coerce")
     unclassified_area   = clipped.loc[clipped["_apt_num"].isna(), "_area_m2"].sum()
@@ -150,7 +150,7 @@ def check_soil_suitability(
     classified_pct   = round((total_area - unclassified_area) / total_area * 100, 1)
     unclassified_pct = round(unclassified_area / total_area * 100, 1)
 
-    # Distribuição de área por classe (%)
+    # Area distribution by class (%)
     area_by_class = (
         classified
         .groupby("_apt_num")["_area_m2"]
@@ -182,7 +182,7 @@ def check_soil_suitability(
     dominant_class = int(area_by_class.index[0])
     dominant_pct   = round(area_by_class.iloc[0] / total_area * 100, 1)
 
-    # ── solo dominante ────────────────────────────────────────────────────────
+    # ── dominant soil ────────────────────────────────────────────────────────
     dom_rows = classified[classified["_apt_num"] == dominant_class].copy()
 
     leg_col = "legenda" if "legenda" in dom_rows.columns else None
@@ -196,7 +196,7 @@ def check_soil_suitability(
     water_props          = SOIL_WATER_PROPERTIES.get(resolved_name, SOIL_WATER_PROPERTIES["default"])
     apt_info             = SOIL_APTITUDE_CLASSES.get(dominant_class, {})
 
-    # ── lista de solos encontrados ────────────────────────────────────────────
+    # ── List of soils found ────────────────────────────────────────────
     soil_types = []
     if leg_col:
         for leg_val, grp in classified.groupby(leg_col):
@@ -225,7 +225,7 @@ def check_soil_suitability(
         "suitable_for_agriculture":     apt_info.get("suitable", False),
         "dominant_percentage":          dominant_pct,
         "area_breakdown":               area_breakdown,
-        "soil_types":                   soil_types[:5],    # top-5 solos
+        "soil_types":                   soil_types[:5],    # top-5 soils
         "water_props":                  water_props,
         "aptitude_label":               apt_info.get("label", "N/D"),
         "aptitude_description":         apt_info.get("description", ""),
