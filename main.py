@@ -56,7 +56,7 @@ def load_geojson(path: str) -> Dict:
     else:
         geometry = gj
     if geometry["type"] not in ("Polygon", "MultiPolygon"):
-        raise ValueError(f"Geometria inválida: {geometry['type']}. Use Polygon ou MultiPolygon.")
+        raise ValueError(f"Invalid Geometry: {geometry['type']}. Use Polygon ou MultiPolygon.")
     return geometry
 
 
@@ -119,7 +119,7 @@ def synthetic_copernicus(event_type: str) -> Dict:
         "CRI1":  {"baseline_mean": 0.30, "event_mean":  0.55,"anomaly_abs":  0.25, "anomaly_pct":  83.3, "observations": 6},
         "VHI":   {"vci": 32.5, "tci": 28.0, "event_mean": 30.2, "observations": 6},
     }
-    if event_type == "chuva":
+    if event_type == "rainfall":
         data["NDWI"]["event_mean"]  =  0.38
         data["NDWI"]["anomaly_pct"] =  111.1
     return data
@@ -130,11 +130,11 @@ def synthetic_poseidon_summary(event_type: str, start_date: date) -> Dict:
     nm  = CLIMATE_NORMALS_RS.get(start_date.month, {})
     np_ = nm.get("prcp_mm", 110)
     nt  = nm.get("tavg_c", 22)
-    if event_type == "seca":
+    if event_type == "drougth":
         prcp, tavg, rh = round(np_ * 0.28, 1), round(nt + 3.2, 2), 52.3
-    elif event_type == "chuva":
+    elif event_type == "rainfall":
         prcp, tavg, rh = round(np_ * 2.4, 1),  round(nt - 1.5, 2), 92.1
-    elif event_type == "geada":
+    elif event_type == "frost":
         prcp, tavg, rh = round(np_ * 0.7, 1),  round(nt - 6.0, 2), 78.0
     else:
         prcp, tavg, rh = round(np_ * 1.8, 1),  nt, 85.0
@@ -147,9 +147,9 @@ def synthetic_poseidon_summary(event_type: str, start_date: date) -> Dict:
 
 
 def synthetic_poseidon_vote(event_type: str) -> Dict:
-    confirmed   = {"seca": 4, "chuva": 3, "geada": 4, "granizo": 3}.get(event_type, 3)
-    w_score     = {"seca": 68.0, "chuva": 55.0, "geada": 72.0, "granizo": 50.0}.get(event_type, 55.0)
-    dirs        = ["N", "S", "L", "O"]
+    confirmed   = {"drought": 4, "rainfall": 3, "frost": 4, "hail": 3}.get(event_type, 3)
+    w_score     = {"drought": 68.0, "rainfall": 55.0, "frost": 72.0, "hail": 50.0}.get(event_type, 55.0)
+    dirs        = ["N", "S", "E", "W"]
     votes       = {}
     intensities = [75, 62, 70, 45] if confirmed == 4 else [72, 55, 40, 28]
     for i, d in enumerate(dirs):
@@ -160,25 +160,25 @@ def synthetic_poseidon_vote(event_type: str) -> Dict:
             "point_id":  45729 + i,
             "lat": -33.498, "lon": -53.357, "direction": d,
             "reason": (
-                f"Prcp 27% do normal | Tmed +3.1°C | Intensidade {intensities[i]}/100"
+                f"Prcp 27% of the norm | Tmed +3.1°C | Intensity {intensities[i]}/100"
                 if ok else
-                f"Sem anomalia significativa | Intensidade {intensities[i]}/100"
+                f"No significant anomaly | Intensity {intensities[i]}/100"
             ),
         }
-    signal_level = "forte" if w_score >= 60 else "moderado" if w_score >= 35 else "fraco"
+    signal_level = "Strong" if w_score >= 60 else "Moderate" if w_score >= 35 else "Weak"
     return {
         "passed": w_score >= 35, "votes": votes,
         "score": confirmed, "total": 4,
         "weighted_score": w_score, "signal_level": signal_level,
         "description": (
-            f"Score climático IDW: {w_score:.0f}/100 — sinal {signal_level} "
-            f"({'✅ APROVADO' if w_score >= 35 else '❌ REPROVADO'})"
+            f"Climate Score IDW: {w_score:.0f}/100 — signal {signal_level} "
+            f"({'✅ APROVED' if w_score >= 35 else '❌ FAIL'})"
         ),
     }
 
 
 def synthetic_soil(event_type: str) -> Dict:
-    """Dados de solo sintéticos para dry-run."""
+    """Synthetic soil data for dry-run."""
     return {
         "error":                        None,
         "dominant_class":               2,
