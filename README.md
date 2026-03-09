@@ -187,7 +187,6 @@ python main.py \
   --problem  drought \
   --crop     soybean \
   --db       "postgresql://user:password@host:5434/poseidon" \
-  --area-ha  200 \
   --planting 2023-10-20 \
   --farm-name "Fazenda São João"
 ```
