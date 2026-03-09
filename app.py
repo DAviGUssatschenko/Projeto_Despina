@@ -72,10 +72,8 @@ div[data-testid="stTabs"] button{ font-family:'Space Mono',monospace; font-size:
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────────────
 
+#constants
 SOIL_WATER = {
     "Latossolo Vermelho":         {"AWC":120,"Ks":30,"fc":35,"wp":15,"retencao":"média"},
     "Latossolo Amarelo":          {"AWC":100,"Ks":25,"fc":32,"wp":14,"retencao":"média"},
@@ -151,16 +149,14 @@ INDEX_META = {
     "NDVI": {"label":"NDVI", "desc":"Índice geral de vegetação",          "invert":False,"color_low":(220,50,30), "color_high":(30,180,60)},
 }
 
-# Shared plotly theme
+#shared plotly theme
 _PLOT_BASE  = dict(template="plotly_dark", paper_bgcolor="#0d1117", plot_bgcolor="#161b22",
                    font=dict(family="DM Sans", color="#e6edf3"))
 _GRID_STYLE = dict(showgrid=True, gridcolor="#21262d")
 
 
-# ─────────────────────────────────────────────────────
-# Small utilities
-# ─────────────────────────────────────────────────────
 
+#small utilities
 def rgb_to_hex(c):
     return f"#{c[0]:02x}{c[1]:02x}{c[2]:02x}"
 
@@ -188,10 +184,8 @@ def info_cell(label, value, extra_style=""):
             f"<div class='info-value' style='{extra_style}'>{value}</div></div>")
 
 
-# ─────────────────────────────────────────────────────
-# API helpers
-# ─────────────────────────────────────────────────────
 
+#API helpers
 def _parse_openmeteo(data, rename):
     """Merge daily + hourly RH from an Open-Meteo response and rename columns."""
     df_d = pd.DataFrame(data["daily"]); df_d["time"] = pd.to_datetime(df_d["time"])
@@ -300,10 +294,7 @@ def fetch_satellite_api(geojson_feature, start_date, end_date):
     except Exception: return pd.DataFrame()
 
 
-# ─────────────────────────────────────────────────────
-# Domain functions
-# ─────────────────────────────────────────────────────
-
+#domain functions
 def get_soil_type(row):
     if not row: return "default", SOIL_WATER["default"]
     for val in row.values():
@@ -449,10 +440,8 @@ def overall_verdict(s_sat, s_prcp, s_clim, n_sat_dates=3):
     return "sim" if ws/tw>=0.70 else ("parcial" if ws/tw>=0.35 else "nao")
 
 
-# ─────────────────────────────────────────────────────
-# Geometry helpers
-# ─────────────────────────────────────────────────────
 
+#geometry helpers
 def _flatten_coords(c, out):
     if not c: return
     if isinstance(c[0], (int, float)): out.append(c)
@@ -480,10 +469,8 @@ def parse_geometry(geom):
     return coords_flat, rings_plot, area_km2, lat, lon
 
 
-# ─────────────────────────────────────────────────────
-# Charts
-# ─────────────────────────────────────────────────────
 
+#charts
 def chart_satellite(ts, start, end):
     fig = make_subplots(rows=2,cols=1,shared_xaxes=True,row_heights=[0.65,0.35],vertical_spacing=0.06)
     for col in [c for c in ts.columns if c.endswith("_mean")]:
@@ -578,10 +565,8 @@ def chart_clima_evento(clim, start, end, complaint):
     return fig
 
 
-# ─────────────────────────────────────────────────────
-# Map
-# ─────────────────────────────────────────────────────
 
+#map
 def build_index_map(rings_plot, lat, lon, ts_df, selected_index, selected_date_str):
     m        = folium.Map(location=[lat,lon], zoom_start=12, tiles="CartoDB dark_matter")
     col_name = f"{selected_index}_mean" if selected_index else None
@@ -626,10 +611,8 @@ def build_index_map(rings_plot, lat, lon, ts_df, selected_index, selected_date_s
     return m
 
 
-# ─────────────────────────────────────────────────────
-# HTML snippets
-# ─────────────────────────────────────────────────────
 
+#HTML snippets
 def verdict_html(v):
     label = STATUS_LABEL[v]; cls = f"verdict-{v if v!='nd' else 'parcial'}"; color = STATUS_COLOR[v]
     return (f"<div class='verdict-card {cls}'>"
@@ -640,10 +623,8 @@ def verdict_html(v):
             f"O problema reportado é visível nos dados disponíveis</div></div>")
 
 
-# ─────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────
 
+#MAIN
 def main():
     st.sidebar.markdown("## 🛰️ Diagnóstico Agrícola")
     st.sidebar.markdown("---")
@@ -666,7 +647,7 @@ def main():
     try: geojson_data = json.loads(geojson_file.read())
     except Exception as e: st.error(f"Erro ao ler GeoJSON: {e}"); return
 
-    # ── Suporte ao formato pipeline (chave "meta" presente) ──
+    #pipeline format support (key "meta" present)
     if "meta" in geojson_data and "geometry" in geojson_data:
         meta = geojson_data["meta"]
         geojson_data = {
@@ -740,7 +721,7 @@ def main():
     with st.spinner("📊 Buscando baseline histórico..."):
         hist_baseline = fetch_historical_baseline_api(float(lat), float(lon), start_dt)
 
-    compute_water_balance(clim, float(lat), soil_props)  # pre-computes wb (available for future extensions)
+    compute_water_balance(clim, float(lat), soil_props) #pre-computes wb (available for future extensions)
 
     clim_event  = clim[(clim["date"]>=start_dt)&(clim["date"]<=end_dt)].copy()
     anomaly     = compute_anomaly(clim_event, "api", hist_baseline)
@@ -751,7 +732,7 @@ def main():
     v_clim, _, _ = assess_climate_complement(clim, start_dt, end_dt, complaint, rh_high, rh_low)
     v_total      = overall_verdict(v_sat, v_prcp, v_clim, n_sat_dates)
 
-    # ── Header ──
+    #header
     badge_c   = "badge-chuva" if complaint == "chuva" else "badge-seca"
     badge_sat = (
         "<span style='background:#1c2030;color:#bc8cff;border:1px solid #bc8cff;"
@@ -780,11 +761,11 @@ def main():
         + info_cell("Imagens",     str(n_sat_dates))
         + "</div>", unsafe_allow_html=True)
 
-    # ── TABS ──
+    #TABS
     tab_diag, tab_sat, tab_imgs, tab_clima, tab_map = st.tabs([
         "🎯 Diagnóstico","🛰️ Satélite","🖼️ Imagens","🌧️ Clima","🗺️ Localização"])
 
-    # ── DIAGNÓSTICO ──
+    #diagnostic
     with tab_diag:
         st.markdown(verdict_html(v_total), unsafe_allow_html=True)
         if anomaly:
@@ -824,7 +805,7 @@ def main():
                      "precipitação":{"status":v_prcp},"clima_complementar":{"status":v_clim},
                      "veredicto_final":v_total})
 
-    # ── SATÉLITE ──
+    #satellite
     with tab_sat:
         if ts is None or ts.empty:
             st.warning("Nenhuma imagem Sentinel-2 sem nuvens encontrada.")
@@ -836,7 +817,7 @@ def main():
             with st.expander("📊 Dados brutos"):
                 st.dataframe(ts, use_container_width=True, height=300)
 
-    # ── IMAGENS ──
+    #images
     with tab_imgs:
         if using_api_satellite:
             st.info("☁️ **Modo API:** STAC (Element84/AWS). Veja a série na aba **🛰️ Satélite**.")
@@ -873,7 +854,7 @@ def main():
         if not images_local["compiled"] and not images_local["individual"] and not using_api_satellite:
             st.warning("Nenhuma imagem local encontrada.")
 
-    # ── CLIMA ──
+    #climate
     with tab_clima:
         st.markdown("#### 🌧️ Clima do Evento")
         st.caption(f"Fonte: **Open-Meteo Archive API** — lat {lat:.4f}°, lon {lon:.4f}° · Bioma: **{regional['bioma']}**")
@@ -915,7 +896,7 @@ def main():
             cs  = [c for c in ["date","prcp","tmin","tmax","tavg","rh_avg","eto"] if c in win.columns]
             st.dataframe(win[cs].sort_values("date").round(2), use_container_width=True, height=300)
 
-    # ── LOCALIZAÇÃO ──
+    #location
     with tab_map:
         st.subheader("Localização do Caso")
 
@@ -930,7 +911,7 @@ def main():
 
         col_map, col_right = st.columns([3, 2])
 
-        # Right panel — widgets first so values feed into map
+        #Right panel — widgets first so values feed into map
         with col_right:
             st.markdown("<div class='side-title'>🛰️ Índice Espectral</div>", unsafe_allow_html=True)
             if not has_sat:
@@ -1000,7 +981,7 @@ def main():
                                 f"color:{dc};padding:2px 0;{fw}'>● {d}{tag}</div>",
                                 unsafe_allow_html=True)
 
-        # Left panel — map + timeline slider
+        #Left panel — map + timeline slider
         with col_map:
             m_folium = build_index_map(
                 rings_plot=rings_plot, lat=lat, lon=lon, ts_df=ts,

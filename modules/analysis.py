@@ -1,7 +1,7 @@
 """
 modules/analysis.py
-Motor de validação: cruza dados Copernicus + Poseidon + Solo EMBRAPA
-e calcula score de confiança + veredicto final.
+Validation engine: cross-references Copernicus + Poseidon + EMBRAPA Soil data
+and calculates a confidence score + final verdict.
 """
 
 from __future__ import annotations
@@ -41,8 +41,7 @@ class ValidationEngine:
         self.crop_params   = CROP_PARAMS.get(crop_type, CROP_PARAMS["soja"])
         self._checks: List[Dict] = []
 
-    # ── ponto de entrada ──────────────────────────────────────────────────────
-
+    #entry point
     def run(
         self,
         copernicus_data:  Dict,
@@ -53,24 +52,24 @@ class ValidationEngine:
     ) -> Dict:
         self._checks = []
 
-        # 1. Satélite
+        #satellite
         self._check_satellite(copernicus_data)
-        # 2. Poseidon — votação IDW
+        #poseidon — IDW voting
         self._check_poseidon_vote(poseidon_vote)
-        # 3. Poseidon — resumo meteorológico
+        #poseidon — weather summary
         self._check_poseidon_summary(poseidon_summary)
-        # 4. Consistência cruzada satélite ↔ estação
+        #cross-consistency satellite ↔ station
         self._check_cross_consistency(copernicus_data, poseidon_summary)
-        # 5. Fase fenológica
+        #phenological phase
         phase_info = self._check_crop_phase()
-        # 6. Solo EMBRAPA (se disponível)
+        #EMBRAPA soil (if available)
         soil_check = self._check_soil(soil_data) if soil_data and not soil_data.get("error") else None
 
         total_weight = sum(c["weight"] for c in self._checks)
         achieved     = sum(c["weight"] for c in self._checks if c["passed"])
         pct_passed   = (achieved / total_weight * 100) if total_weight else 0
 
-        # Penalidade de incerteza por falta de imagens sem nuvem
+        #uncertainty penalty due to lack of cloud-free images.
         obs_total = sum(
             copernicus_data.get(idx, {}).get("observations", 0)
             for idx in ["NDVI", "NDWI", "NDMI"]
@@ -79,7 +78,7 @@ class ValidationEngine:
         confidence = round(min(pct_passed - uncertainty_penalty, 92), 1)
         confidence = max(confidence, 0)
 
-        # IDW score → severidade
+        #IDW score → severity
         idw_score = poseidon_vote.get("weighted_score", 0)
         if   idw_score >= 70: severity = "muito severo"
         elif idw_score >= 50: severity = "severo"
@@ -87,7 +86,7 @@ class ValidationEngine:
         elif idw_score >= 20: severity = "fraco"
         else:                 severity = "ausente / inconclusivo"
 
-        # Estimativa de perda (agora usa solo)
+        #loss estimate (now using soil)
         loss_estimate = self._estimate_yield_loss(
             copernicus_data,
             poseidon_summary,
@@ -124,8 +123,7 @@ class ValidationEngine:
             },
         }
 
-    # ── checks de satélite ────────────────────────────────────────────────────
-
+    #satellite checks
     def _check_satellite(self, cop: Dict) -> None:
         sat_thresh = self.thresholds.get("satellite", {})
 
@@ -228,8 +226,7 @@ class ValidationEngine:
                 "detail": "Enhanced Vegetation Index — robusto em alta densidade de copa",
             })
 
-    # ── checks Poseidon ───────────────────────────────────────────────────────
-
+    #checks Poseidon
     def _check_poseidon_vote(self, vote: Dict) -> None:
         w_score      = vote.get("weighted_score", 0.0)
         signal_level = vote.get("signal_level", "desconhecido")
@@ -363,8 +360,7 @@ class ValidationEngine:
             "description": f"{days_after} DAP — fora das fases catalogadas",
         }
 
-    # ── check de solo ─────────────────────────────────────────────────────────
-
+    #check the soil
     def _check_soil(self, soil_data: Dict) -> Dict:
         """
         Avalia aptidão do solo para o evento declarado.
@@ -383,7 +379,7 @@ class ValidationEngine:
         soil_name      = soil_data.get("resolved_name") or soil_data.get("soil_name", "N/D")
         dom_pct        = soil_data.get("dominant_percentage", 0)
 
-        # Check de aptidão agrícola
+        #agricultural fitness check
         self._checks.append({
             "name":   f"Aptidão do Solo EMBRAPA — Classe {dominant_class} ({apt_label})",
             "passed": suitable,
@@ -392,7 +388,7 @@ class ValidationEngine:
             "detail": soil_data.get("aptitude_description", ""),
         })
 
-        # Check de vulnerabilidade do solo ao evento declarado
+        #soil vulnerability check for the declared event.
         amplifier_map = SOIL_EVENT_AMPLIFIER.get(self.event_type, {})
         amplifier     = amplifier_map.get(retencao, 1.0)
 
@@ -425,7 +421,7 @@ class ValidationEngine:
             })
 
         elif self.event_type == "geada":
-            # Solos úmidos/pesados protegem mais da geada por calor latente
+            #moist/heavy soils offer greater protection against frost due to latent heat.
             self._checks.append({
                 "name":   "Solo — capacidade de tamponamento térmico",
                 "passed": retencao in ("alta", "muito alta"),
@@ -447,8 +443,7 @@ class ValidationEngine:
             "textura":         water_props.get("textura", "N/D"),
         }
 
-    # ── estimativa de perda ───────────────────────────────────────────────────
-
+    #loss estimate
     def _estimate_yield_loss(
         self,
         cop:           Dict,
@@ -463,7 +458,7 @@ class ValidationEngine:
         price       = crop_p["price_brl_saca"]
         area        = self.area_ha
 
-        # Ajuste histórico local
+        #local history adjustment
         hist_yield_note = None
         if hist_baseline and hist_baseline.get("prcp_mean_mm"):
             hist_prcp   = hist_baseline["prcp_mean_mm"]
@@ -489,7 +484,7 @@ class ValidationEngine:
             }
             base_yield = local_yield_est
 
-        # Fração de perda climática
+        #climate loss fraction
         climate_loss_frac = 0.0
         if self.event_type == "seca" and summary:
             period_days = summary.get("period_days", 30)
@@ -512,17 +507,17 @@ class ValidationEngine:
         elif self.event_type == "granizo":
             climate_loss_frac = 0.45
 
-        # Fração de perda satelital (NDVI)
+        #satellite Loss Fraction (NDVI)
         ndvi_loss_frac = 0.0
         if "NDVI" in cop and cop["NDVI"].get("anomaly_pct") is not None:
             ndvi_drop      = -cop["NDVI"]["anomaly_pct"] / 100
             ndvi_loss_frac = max(0, ndvi_drop * 0.9)
 
-        # Média ponderada + sensibilidade fenológica
+        #weighted average + phenological sensitivity
         raw_loss_frac   = 0.40 * climate_loss_frac + 0.60 * ndvi_loss_frac
         final_loss_frac = min(raw_loss_frac * sensitivity * 2.0, 0.95)
 
-        # Fator de amplificação do solo
+        #soil amplification factor
         soil_amplifier = 1.0
         soil_amp_note  = None
         if soil_data and not soil_data.get("error"):

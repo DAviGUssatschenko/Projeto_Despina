@@ -1,6 +1,6 @@
 """
 modules/copernicus.py
-Integração com Copernicus Data Space Ecosystem (CDSE) / Sentinel Hub.
+Integration with Copernicus Data Space Ecosystem (CDSE) / Sentinel Hub.
 """
 
 from __future__ import annotations
@@ -15,9 +15,9 @@ from typing import Dict, List, Optional
 import requests
 import numpy as np
 
-# ── Disco-cache simples (sem dependências extras) ──────────────────────────
+#simple disk cache
 _CACHE_DIR = Path(__file__).parent / ".copernicus_cache"
-_CACHE_TTL  = 7 * 24 * 3600   # 7 dias em segundos
+_CACHE_TTL  = 7 * 24 * 3600   #7 days in seconds
 
 def _cache_key(*parts) -> str:
     raw = json.dumps(parts, sort_keys=True, default=str)
@@ -42,9 +42,9 @@ def _cache_set(key: str, value) -> None:
         path = _CACHE_DIR / f"{key}.json"
         path.write_text(json.dumps({"ts": time.time(), "value": value}))
     except Exception:
-        pass  # cache é opcional — nunca bloqueia o fluxo principal
+        pass  #caching is optional — it never blocks the main stream.
 
-# Importa TUDO do config, incluindo as credenciais
+#imports EVERYTHING from the config, including credentials.
 from config import (
     CDSE_CLIENT_ID,
     CDSE_CLIENT_SECRET,
@@ -79,7 +79,7 @@ class CopernicusClient:
     INDICES = list(EVALSCRIPTS.keys())
 
     def __init__(self):
-        # Credenciais lidas diretamente do config.py — sem env vars necessárias
+        #credentials read directly from config.py — no environment variables required.
         self.client_id     = CDSE_CLIENT_ID
         self.client_secret = CDSE_CLIENT_SECRET
         self._token: Optional[str] = None
@@ -112,7 +112,7 @@ class CopernicusClient:
         if index_name not in EVALSCRIPTS:
             raise ValueError(f"Índice desconhecido: {index_name}")
 
-        # ── Cache hit? ─────────────────────────────────────────────────────
+        #cache hit
         ck = _cache_key(geometry, str(start_date), str(end_date), index_name, aggregation_days)
         cached = _cache_get(ck)
         if cached is not None:
@@ -139,8 +139,8 @@ class CopernicusClient:
                 },
                 "aggregationInterval": {"of": f"P{aggregation_days}D"},
                 "evalscript": EVALSCRIPTS[index_name],
-                # EPSG:4326 usa graus como unidade — converte metros → graus
-                # 1 grau ≈ 111 320 m; mantém resolução abaixo do limite de 1500 m/pixel
+                #EPSG:4326 uses degrees as the unit — converts meters to degrees.
+                #1 degree ≈ 111,320 m; maintains resolution below the 1500 m/pixel limit.
                 "resx": round(SENTINEL2_RESOLUTION / 111_320, 7),
                 "resy": round(SENTINEL2_RESOLUTION / 111_320, 7),
             },
@@ -181,7 +181,7 @@ class CopernicusClient:
                 continue
 
             def _f(v):
-                """Converte para float de forma segura — API pode retornar 'NaN' como string."""
+                """Safely converts to float — API can return 'NaN' as a string."""
                 try:
                     return float(v)
                 except (TypeError, ValueError):
@@ -207,7 +207,7 @@ class CopernicusClient:
         start_date: date,
         end_date:   date,
     ) -> Dict:
-        """Consulta cobertura de nuvens média via Statistics API (SCL band)."""
+        """Check average cloud cover via the Statistics API (SCL band)."""
 
         ck = _cache_key("cloud", geometry, str(start_date), str(end_date))
         cached = _cache_get(ck)
@@ -290,7 +290,7 @@ function evaluatePixel(s) {
         print(f"   Baseline : {baseline_start} → {baseline_end}")
         print(f"   Evento   : {start_date} → {end_date}")
 
-        # Cobertura de nuvens
+        #cloud cover
         cloud = self._get_cloud_cover_stats(geometry, start_date, end_date)
         if cloud:
             cloud_mean = cloud["mean_pct"]
@@ -320,7 +320,7 @@ function evaluatePixel(s) {
             }
 
         results: Dict = {}
-        # Máximo 8 workers — equilibra paralelismo vs rate-limit da API
+        #maximum 8 workers — balances parallelism vs API rate-limit
         with ThreadPoolExecutor(max_workers=8) as pool:
             futures = {pool.submit(_fetch_index, idx): idx for idx in self.INDICES}
             for future in as_completed(futures):
@@ -333,7 +333,7 @@ function evaluatePixel(s) {
                     print(f"   └─ {idx_name}... ⚠ {exc}")
                     results[idx_name] = {"error": str(exc)}
 
-        # VHI calculado
+        #calculated VHI
         if "NDVI" in results and "NDMI" in results:
             ndvi_e = results["NDVI"].get("event_mean")
             ndmi_e = results["NDMI"].get("event_mean")
@@ -353,8 +353,7 @@ function evaluatePixel(s) {
         return results
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
-
+#helpers
 def _safe_mean(values):
     v = [x for x in values if x is not None and not (isinstance(x, float) and np.isnan(x))]
     return round(float(np.mean(v)), 5) if v else None

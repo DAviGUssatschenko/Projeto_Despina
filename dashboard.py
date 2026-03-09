@@ -1,16 +1,16 @@
 """
-dashboard.py — Poseidon · Copernicus · EMBRAPA  Diagnostic Dashboard
-=====================================================================
-Uso:
-  streamlit run dashboard.py
+dashboard.py — Poseidon · Copernicus · EMBRAPA Diagnostic Dashboard
 
-Dois modos:
-  • Pipeline (JSON) — carrega saída de main.py com dados Poseidon + Copernicus reais.
-  • Standalone (GeoJSON) — busca dados via Open-Meteo + STAC/Sentinel-2 (sem banco).
+Usage:
+streamlit run dashboard.py
+Two modes:
 
-Fluxo pipeline:
-  1. Execute main.py normalmente → gera pipeline_*.json na pasta do projeto
-  2. Abra o dashboard → carregue o JSON na barra lateral
+• Pipeline (JSON) — loads output from main.py with real Poseidon + Copernicus data.
+• Standalone (GeoJSON) — retrieves data via Open-Meteo + STAC/Sentinel-2 (no database).
+
+Pipeline flow:
+1. Run main.py normally → generates pipeline_*.json in the project folder
+2. Open the dashboard → load the JSON in the sidebar
 """
 
 import json
@@ -23,7 +23,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
-# ── Importa constantes do projeto ─────────────────────────────────────────────
+#importa constantes do projeto
 try:
     from config import SOIL_WATER_PROPERTIES, SOIL_CODE_ALIASES
     _SOIL_WATER = SOIL_WATER_PROPERTIES
@@ -61,9 +61,8 @@ except ImportError:
 
 warnings.filterwarnings("ignore")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Página
-# ─────────────────────────────────────────────────────────────────────────────
+
+#Page
 st.set_page_config(
     page_title="Diagnóstico Agrícola · Poseidon + Sentinel-2",
     page_icon="🛰️",
@@ -101,10 +100,8 @@ div[data-testid="stTabs"] button{font-family:'Space Mono',monospace;font-size:13
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Constantes
-# ─────────────────────────────────────────────────────────────────────────────
 
+#constants
 SOIL_WATER = _SOIL_WATER or {
     "Latossolo Vermelho-Amarelo": {"AWC": 110, "Ks": 28, "fc": 33, "wp": 14, "retencao": "media"},
     "default": {"AWC": 100, "Ks": 20, "fc": 30, "wp": 15, "retencao": "media"},
@@ -125,7 +122,7 @@ BIOME_ALIASES_MAP = {
     "mata": "Mata Atlantica", "pamp": "Pampa", "pant": "Pantanal",
 }
 
-# Índices que o copernicus.py coleta (mesma lista)
+#indexes that copernicus.py collects (same list)
 ALL_INDICES  = ["NDVI", "NDRE", "EVI", "NDWI", "NDMI", "BSI", "NBR", "PSRI", "CRI1"]
 VEG_POSITIVE = ["NDVI", "NDRE", "EVI", "NDWI", "NDMI", "NBR"]
 
@@ -155,10 +152,8 @@ _PLOT_BASE = dict(template="plotly_dark", paper_bgcolor="#0d1117", plot_bgcolor=
 _GRID      = dict(showgrid=True, gridcolor="#21262d")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Utilitarios
-# ─────────────────────────────────────────────────────────────────────────────
 
+#Utilities
 def rgb_to_hex(c):
     return f"#{c[0]:02x}{c[1]:02x}{c[2]:02x}"
 
@@ -188,10 +183,8 @@ def brl(v):
         return "R$ -"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Conversao pipeline -> DataFrames
-# ─────────────────────────────────────────────────────────────────────────────
 
+#conversion pipeline -> DataFrames
 def cop_to_ts(cop_data: dict) -> pd.DataFrame:
     """
     Converte cop_data (saida de collect_all_indices) em DataFrame de serie temporal.
@@ -205,7 +198,7 @@ def cop_to_ts(cop_data: dict) -> pd.DataFrame:
             for item in data.get(series_key) or []:
                 if not isinstance(item, dict):
                     continue
-                # A Statistics API retorna {"from": "2023-01-01", "to": ..., "mean": ..., "stdev": ...}
+                #the Statistics API returns {"from": "2023-01-01", "to": ..., "mean": ..., "stdev": ...}
                 raw_dt = (item.get("from") or item.get("date")
                           or (item.get("interval") or {}).get("from"))
                 if not raw_dt:
@@ -245,10 +238,7 @@ def pos_daily_to_df(pos_daily: list) -> pd.DataFrame:
     return df.sort_values("date").reset_index(drop=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Open-Meteo (modo standalone)
-# ─────────────────────────────────────────────────────────────────────────────
-
+#open-Meteo (modo standalone)
 def _parse_openmeteo(data, rename):
     df_d = pd.DataFrame(data["daily"]); df_d["time"] = pd.to_datetime(df_d["time"])
     df_h = pd.DataFrame(data["hourly"]); df_h["time"] = pd.to_datetime(df_h["time"]).dt.date
@@ -366,10 +356,8 @@ def fetch_stac(geojson_feature, start_date_str, end_date_str):
         return pd.DataFrame()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Dominio
-# ─────────────────────────────────────────────────────────────────────────────
 
+#Domain
 def get_soil_props(soil_name: str) -> dict:
     return SOIL_WATER.get(soil_name, SOIL_WATER.get("default", {}))
 
@@ -491,10 +479,8 @@ def standalone_verdict(ts, clim, start, end, complaint, bioma):
     return "sim" if ws / tw >= 0.70 else ("parcial" if ws / tw >= 0.35 else "nao")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Geometria
-# ─────────────────────────────────────────────────────────────────────────────
 
+#geometry
 def _flatten(c, out):
     if not c: return
     if isinstance(c[0], (int, float)): out.append(c)
@@ -521,10 +507,8 @@ def parse_geometry(geom):
     return flat, rings, area, lat, lon
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Graficos
-# ─────────────────────────────────────────────────────────────────────────────
 
+#graphics
 def chart_satellite(ts: pd.DataFrame, start, end):
     mean_cols = [c for c in ts.columns if c.endswith("_mean")]
     std_cols  = [c for c in ts.columns if c.endswith("_std")]
@@ -651,10 +635,8 @@ def chart_water_balance(wb: pd.DataFrame, start, end, complaint):
     return fig
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Mapa Folium
-# ─────────────────────────────────────────────────────────────────────────────
 
+#folium Map
 def build_map(rings_plot, lat, lon, ts_df, sel_index, sel_date_str):
     if not HAS_FOLIUM or not rings_plot:
         return None
@@ -699,9 +681,9 @@ def build_map(rings_plot, lat, lon, ts_df, sel_index, sel_date_str):
     return m
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Paineis de diagnostico
-# ─────────────────────────────────────────────────────────────────────────────
+
+#diagnostic panels
+
 
 def panel_pipeline_diag(analysis: dict, cop_data: dict, pos_summ: dict, pos_vote: dict):
     verdict = analysis.get("verdict", "INCONCLUSIVO")
@@ -849,10 +831,8 @@ def panel_standalone_diag(v_total, clim_event, hist_df):
             </div>""", unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────────────────────────────
 
+#MAIN
 def main():
     st.sidebar.markdown("## Diagnostico Agricola")
     st.sidebar.markdown("---")
@@ -865,7 +845,7 @@ def main():
     )
     pipeline_mode = mode.startswith("Pipeline")
 
-    # ── CARREGAR ARQUIVO ──────────────────────────────────────────────────────
+    #UPLOAD FILE
     if pipeline_mode:
         uploaded = st.sidebar.file_uploader(
             "pipeline_*.json", type=["json"],
@@ -922,12 +902,12 @@ def main():
         src_tag = ("<span style='background:#1a1f2e;color:#bc8cff;border:1px solid #bc8cff;"
                    "border-radius:12px;font-size:11px;padding:2px 8px;"
                    "font-family:Space Mono,monospace'>Poseidon + Copernicus + EMBRAPA</span>")
-        # nao ha hist para modo pipeline (Poseidon ja tem baseline proprio)
+        #there is no history for pipeline mode (Poseidon already has its own baseline).
         hist_api  = pd.DataFrame()
         clim_event = clim[(clim["date"] >= start_dt) & (clim["date"] <= end_dt)].copy() if not clim.empty else pd.DataFrame()
 
     else:
-        # ── STANDALONE ───────────────────────────────────────────────────────
+        #STANDALONE
         uploaded = st.sidebar.file_uploader(
             "Caso (.geojson / .json)", type=["geojson", "json"],
             help="FeatureCollection com: evento, inicio, fim, solo, bioma, cultura.")
@@ -1015,7 +995,7 @@ def main():
                    "border-radius:12px;font-size:11px;padding:2px 8px;"
                    "font-family:Space Mono,monospace'>Open-Meteo + STAC</span>")
 
-    # ── HEADER ───────────────────────────────────────────────────────────────
+    #HEADER
     evt_label = {"seca": "Seca / Deficit Hidrico", "chuva": "Excesso de Chuva",
                  "geada": "Geada", "granizo": "Granizo"}.get(complaint, complaint.upper())
     badge_cls = "badge-chuva" if complaint == "chuva" else "badge-seca"
@@ -1044,18 +1024,18 @@ def main():
     st.sidebar.caption(f"{farm_name} · {complaint.upper()}\n"
                        f"{start_dt.strftime('%d/%m/%Y')} - {end_dt.strftime('%d/%m/%Y')}")
 
-    # ── TABS ─────────────────────────────────────────────────────────────────
+    #TABS
     tab_diag, tab_sat, tab_clima, tab_bal, tab_map = st.tabs([
         "Diagnostico", "Satelite", "Clima", "Balanco Hidrico", "Localizacao"])
 
-    # ── DIAGNOSTICO ──────────────────────────────────────────────────────────
+    #diagnostic
     with tab_diag:
         if pipeline_mode:
             panel_pipeline_diag(analysis, cop_data, pos_summ, pos_vote)
         else:
             panel_standalone_diag(v_total, clim_event, hist_api)
 
-    # ── SATELITE ─────────────────────────────────────────────────────────────
+    #satellite
     with tab_sat:
         if ts.empty:
             msg = ("Serie temporal Copernicus nao disponivel no pipeline JSON."
@@ -1091,7 +1071,7 @@ def main():
             with st.expander("Dados brutos"):
                 st.dataframe(ts, use_container_width=True, height=300)
 
-    # ── CLIMA ────────────────────────────────────────────────────────────────
+    #climate
     with tab_clima:
         if clim.empty:
             st.warning("Dados climaticos nao disponiveis.")
@@ -1146,7 +1126,7 @@ def main():
                 st.dataframe(win[cols].sort_values("date").round(2),
                              use_container_width=True, height=300)
 
-    # ── BALANCO HIDRICO ───────────────────────────────────────────────────────
+    #HYDRAULIC BALANCE
     with tab_bal:
         if clim.empty:
             st.warning("Dados climaticos nao disponiveis.")
@@ -1166,7 +1146,7 @@ def main():
             except Exception as e:
                 st.error(f"Erro no balanco hidrico: {e}")
 
-    # ── MAPA ─────────────────────────────────────────────────────────────────
+    #MAPA
     with tab_map:
         if not HAS_FOLIUM:
             st.warning("Instale folium e streamlit-folium: "
