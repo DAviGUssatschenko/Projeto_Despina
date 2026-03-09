@@ -16,10 +16,8 @@ from config import (
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Utilitaries
-# ─────────────────────────────────────────────────────────────────────────────
 
+#Utilitaries
 def _fix_encoding(value) -> str:
     """Fixes latin1→utf-8 mojibake in strings from the EMBRAPA shapefile."""
     if pd.isna(value):
@@ -66,10 +64,8 @@ def get_soil_water_props(soil_code: str, soil_name: str) -> Dict:
     return SOIL_WATER_PROPERTIES.get(resolved, SOIL_WATER_PROPERTIES["default"])
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main function
-# ─────────────────────────────────────────────────────────────────────────────
 
+#main function
 def check_soil_suitability(
     geojson_path: str,
     soil_shapefile: Optional[str] = None,
@@ -92,7 +88,7 @@ def check_soil_suitability(
     """
     shp_path = soil_shapefile or EMBRAPA_SHAPEFILE
 
-    # ── load field ────────────────────────────────────────────────────────
+    #load field
     try:
         field = gpd.read_file(geojson_path)
     except Exception as e:
@@ -101,9 +97,9 @@ def check_soil_suitability(
     if field.empty:
         return {"error": "GeoJSON empty or without valid geometry."}
 
-    # ── load EMBRAPA shapefile ─────────────────────────────────────────────
+    #load EMBRAPA shapefile
     try:
-        # Load only necessary columns; legenda_ap is optional
+        #load only necessary columns; legenda_ap is optional
         soils = gpd.read_file(shp_path, encoding="latin1")
     except Exception as e:
         return {"error": f"Error loading EMBRAPA shapefile ({shp_path}): {e}"}
@@ -111,12 +107,12 @@ def check_soil_suitability(
     if soils.empty:
         return {"error": "Empty EMBRAPA shapefile."}
 
-    # ── fix encoding ──────────────────────────────────────────────────────
+    #fix encoding 
     for col in ["legenda", "legenda_ap"]:
         if col in soils.columns:
             soils[col] = soils[col].apply(_fix_encoding)
 
-    # ── align CRS and clip ─────────────────────────────────────────────────
+    #align CRS and clip
     soils = soils.to_crs(field.crs)
     minx, miny, maxx, maxy = field.total_bounds
     candidate_idx = list(soils.sindex.intersection((minx, miny, maxx, maxy)))
@@ -129,7 +125,7 @@ def check_soil_suitability(
     if clipped.empty:
         return {"error": "Field area does not intersect with EMBRAPA soil data."}
 
-    # ── calculate areas in SIRGAS 2000 Conic (EPSG:5880) ──────────────────────
+    #calculate areas in SIRGAS 2000 Conic (EPSG:5880)
     clipped = clipped.to_crs(5880)
     clipped["_area_m2"] = clipped.geometry.area
     total_area = clipped["_area_m2"].sum()
@@ -137,7 +133,7 @@ def check_soil_suitability(
     if total_area == 0:
         return {"error": "Resulting area is zero after reprojection."}
 
-    # ── suitability ───────────────────────────────────────────────────────────────
+    #suitability
     apt_col = "classe_apt" if "classe_apt" in clipped.columns else None
     if apt_col is None:
         return {"error": "Column 'classe_apt' not found in the shapefile."}
@@ -150,7 +146,7 @@ def check_soil_suitability(
     classified_pct   = round((total_area - unclassified_area) / total_area * 100, 1)
     unclassified_pct = round(unclassified_area / total_area * 100, 1)
 
-    # Area distribution by class (%)
+    #Area distribution by class (%)
     area_by_class = (
         classified
         .groupby("_apt_num")["_area_m2"]
@@ -182,7 +178,7 @@ def check_soil_suitability(
     dominant_class = int(area_by_class.index[0])
     dominant_pct   = round(area_by_class.iloc[0] / total_area * 100, 1)
 
-    # ── dominant soil ────────────────────────────────────────────────────────
+    #dominant soil
     dom_rows = classified[classified["_apt_num"] == dominant_class].copy()
 
     leg_col = "legenda" if "legenda" in dom_rows.columns else None
@@ -196,7 +192,7 @@ def check_soil_suitability(
     water_props          = SOIL_WATER_PROPERTIES.get(resolved_name, SOIL_WATER_PROPERTIES["default"])
     apt_info             = SOIL_APTITUDE_CLASSES.get(dominant_class, {})
 
-    # ── List of soils found ────────────────────────────────────────────
+    #List of soils found
     soil_types = []
     if leg_col:
         for leg_val, grp in classified.groupby(leg_col):
