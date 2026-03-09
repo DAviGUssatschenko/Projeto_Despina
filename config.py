@@ -364,7 +364,7 @@ VALIDATION_THRESHOLDS = {
 }
 
 # ─────────────────────────────────────────────
-# AGRONOMIOC PARAMETERS
+# AGRONOMIC PARAMETERS
 # ─────────────────────────────────────────────
 CROP_PARAMS = {
     "soybean": {
