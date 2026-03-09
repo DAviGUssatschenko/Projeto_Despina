@@ -319,7 +319,7 @@ def _cop_data_with_series(cop_data: dict, start_date: date, end_date: date) -> d
     return out
 
 
-def save_pipeline_json(
+def save_enriched_geojson(
     *,
     farm_name: str,
     event_type: str,
@@ -334,20 +334,29 @@ def save_pipeline_json(
     pos_summ: dict,
     pos_vote: dict,
     soil_data: dict,
+    hist_baseline: dict = None,
     idw_df=None,
     output_path: str = None,
 ) -> str:
     """
-    Serialises all pipeline data in the exact format that dashboard.py
-    expects when loading a pipeline_*.json file.
+    Saves a valid FeatureCollection GeoJSON with all pipeline data embedded
+    inside properties._pipeline. This is the single output file consumed by
+    climate_dashboard.py.
 
-    Returns the path of the saved file.
+    Standard GeoJSON properties (id, evento, inicio, fim, solo, cultura, bioma)
+    are kept at the top level so the file remains a valid, human-readable GeoJSON.
+    All pre-fetched Poseidon + Copernicus data lives under properties._pipeline.
     """
-    safe = farm_name.replace(" ", "_").replace("/", "-")
-    if output_path is None:
-        output_path = f"pipeline_{safe}_{start_date.isoformat()}_{event_type}.json"
+    _EVT_MAP  = {"drought": "seca", "rainfall": "chuva", "frost": "geada", "hail": "granizo"}
+    _CROP_MAP = {"soybean": "SOJA", "corn": "MILHO", "wheat": "TRIGO", "rice": "ARROZ"}
 
-    payload = {
+    evento  = _EVT_MAP.get(event_type.lower(), event_type.lower())
+    cultura = _CROP_MAP.get(crop_type.lower(), crop_type.upper())
+    sd      = soil_data or {}
+    solo    = sd.get("soil_code", "")
+    bioma   = sd.get("biome", "")
+
+    pipeline_block = {
         "meta": {
             "farm_name":  farm_name,
             "event_type": event_type,
@@ -355,66 +364,24 @@ def save_pipeline_json(
             "start_date": start_date.isoformat(),
             "end_date":   end_date.isoformat(),
             "area_ha":    round(float(area_ha), 4) if area_ha else 0.0,
-            "centroid":   {
+            "centroid": {
                 "lat": round(float(centroid.get("lat", 0)), 6),
                 "lon": round(float(centroid.get("lon", 0)), 6),
             },
         },
-        "geometry":         geometry,
-        "analysis":         analysis,
-        "copernicus":       _cop_data_with_series(cop_data, start_date, end_date),
-        "poseidon_summary": pos_summ,
-        "poseidon_vote":    pos_vote,
-        "poseidon_daily":   _idw_daily_to_records(idw_df),
-        "soil_data":        soil_data or {},
+        "analysis":          analysis,
+        "copernicus":        _cop_data_with_series(cop_data, start_date, end_date),
+        "poseidon_summary":  pos_summ,
+        "poseidon_vote":     pos_vote,
+        "poseidon_daily":    _idw_daily_to_records(idw_df),
+        "poseidon_baseline": hist_baseline or {},
+        "soil_data":         sd,
     }
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2, default=_json_default)
-
-    return output_path
-
-
-def save_caso_geojson(
-    *,
-    farm_name: str,
-    event_type: str,
-    crop_type: str,
-    start_date: date,
-    end_date: date,
-    geometry: dict,
-    soil_data: dict,
-    output_path: str = None,
-) -> str:
-    """
-    Saves a FeatureCollection GeoJSON in the exact format expected by
-    climate_dashboard.py (caso_2080.geojson model).
-
-    Properties: id, evento, inicio, fim, solo, cultura, bioma
-    """
-    # English → Portuguese event names (dashboard uses Portuguese internally)
-    _EVT_MAP = {
-        "drought":  "seca",
-        "rainfall": "chuva",
-        "frost":    "geada",
-        "hail":     "granizo",
-    }
-    # English → Portuguese crop names
-    _CROP_MAP = {
-        "soybean": "SOJA",
-        "corn":    "MILHO",
-        "wheat":   "TRIGO",
-        "rice":    "ARROZ",
-    }
-
-    evento  = _EVT_MAP.get(event_type.lower(), event_type.lower())
-    cultura = _CROP_MAP.get(crop_type.lower(), crop_type.upper())
-    solo    = (soil_data or {}).get("soil_code", "")
-    bioma   = (soil_data or {}).get("biome", "")
 
     feature = {
         "type": "Feature",
         "properties": {
+            # ── Standard GeoJSON properties (human-readable, dashboard-compatible) ──
             "id":      farm_name,
             "evento":  evento,
             "inicio":  start_date.isoformat(),
@@ -422,17 +389,21 @@ def save_caso_geojson(
             "solo":    solo,
             "cultura": cultura,
             "bioma":   bioma,
+            # ── All pre-fetched pipeline data ────────────────────────────────────
+            "_pipeline": pipeline_block,
         },
         "geometry": geometry,
     }
-    payload = {"type": "FeatureCollection", "features": [feature]}
 
     safe = farm_name.replace(" ", "_").replace("/", "-")
     if output_path is None:
         output_path = f"caso_{safe}_{start_date.isoformat()}_{evento}.geojson"
 
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+        json.dump(
+            {"type": "FeatureCollection", "features": [feature]},
+            f, ensure_ascii=False, indent=2, default=_json_default,
+        )
 
     return output_path
 
@@ -596,10 +567,10 @@ def main() -> int:
         soil_data=soil_data,
     )
 
-    # ── Export Pipeline JSON ───────────────────────────────────────────────────
+    # ── Export Enriched GeoJSON ────────────────────────────────────────────────
     try:
         _idw = idw_df if "idw_df" in dir() else None
-        pipeline_path = save_pipeline_json(
+        geojson_path = save_enriched_geojson(
             farm_name=args.farm_name,
             event_type=args.problem,
             crop_type=args.crop,
@@ -613,27 +584,13 @@ def main() -> int:
             pos_summ=pos_summ,
             pos_vote=pos_vote,
             soil_data=soil_data,
+            hist_baseline=hist_baseline if "hist_baseline" in dir() else {},
             idw_df=_idw,
             output_path=args.pipeline if args.pipeline else None,
         )
-        console.print(f"\n[bold cyan]📦 Pipeline JSON saved: {pipeline_path}[/bold cyan]")
+        console.print(f"\n[bold cyan]🗺️  Enriched GeoJSON saved: {geojson_path}[/bold cyan]")
     except Exception as e:
-        console.print(f"[yellow]⚠ Error saving pipeline JSON: {e}[/yellow]")
-
-    # ── Export caso GeoJSON (for climate_dashboard.py) ─────────────────────
-    try:
-        caso_path = save_caso_geojson(
-            farm_name=args.farm_name,
-            event_type=args.problem,
-            crop_type=args.crop,
-            start_date=start_date,
-            end_date=end_date,
-            geometry=geometry,
-            soil_data=soil_data,
-        )
-        console.print(f"[bold cyan]🗺️  Caso GeoJSON saved: {caso_path}[/bold cyan]")
-    except Exception as e:
-        console.print(f"[yellow]⚠ Error saving caso GeoJSON: {e}[/yellow]")
+        console.print(f"[yellow]⚠ Error saving enriched GeoJSON: {e}[/yellow]")
 
     # ── Export DOCX ─────────────────────────────────────────────────────────
     try:
