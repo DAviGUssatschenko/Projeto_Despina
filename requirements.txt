@@ -1,3 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# requirements.txt — compatibility shim
+#
+# The canonical dependency list now lives in pyproject.toml.
+# This file exists only for tools/CI that can't read pyproject.toml directly.
+#
+# To regenerate it from the locked state:
+#   uv pip compile pyproject.toml -o requirements.txt
+#
+# To install with uv (recommended):
+#   uv sync
+#
+# To install with plain pip (fallback):
+#   pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ── Web / API ──────────────────────────────────────────────────────────────
 requests>=2.31.0
 
